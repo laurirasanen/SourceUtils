@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Reflection;
 using ICSharpCode.SharpZipLib.Zip;
 
 namespace SourceUtils
@@ -25,7 +26,9 @@ namespace SourceUtils
                 ZipFile archive;
                 if ( pool.TryGetValue( pak, out archive ) ) return archive;
 
-                archive = new ZipFile( pak._bspFile.GetLumpStream( pak.LumpType ) );
+                var stream = pak._bspFile.GetLumpStream( pak.LumpType );
+                archive = new ZipFile( stream );
+                archive.UseZip64 = UseZip64.Off;
 
                 pak.Disposing += _ =>
                 {
@@ -36,7 +39,7 @@ namespace SourceUtils
                 pool.Add( pak, archive );
 
                 return archive;
-            }
+                }
 
             public LumpType LumpType { get; }
 
@@ -72,15 +75,21 @@ namespace SourceUtils
                         }
                     }
 
-                    using ( var archive = new ZipFile( _bspFile.GetLumpStream( LumpType ) ) )
+                    using ( var stream = _bspFile.GetLumpStream( LumpType ) )
                     {
-                        _entryDict.Clear();
-                        for ( var i = 0; i < archive.Count; ++i )
+                        // https://stackoverflow.com/questions/46950386/sharpziplib-1-is-not-a-supported-code-page
+                        ZipConstants.DefaultCodePage = 437;
+                        using ( var archive = new ZipFile( stream ) )
                         {
-                            var entry = archive[i];
-                            var path = $"/{entry.Name.Replace( '\\', '/' )}";
-                            if ( !entry.IsFile || _entryDict.ContainsKey( path ) ) continue;
-                            _entryDict.Add( path, i );
+                            _entryDict.Clear();
+                            for ( var i = 0; i < archive.Count; ++i )
+                            {
+                                var entry = archive[i];
+                                var path = $"/{entry.Name.Replace( '\\', '/' )}";
+                                if ( !entry.IsFile || _entryDict.ContainsKey( path ) )
+                                    continue;
+                                _entryDict.Add( path, i );
+                            }
                         }
                     }
                 }
