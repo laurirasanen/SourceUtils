@@ -7,13 +7,15 @@ using System.Threading;
 using SevenZip;
 using SourceUtils.ValveBsp;
 using SourceUtils.ValveBsp.Entities;
-using SevenZip.Compression.LZMA;
-using Decoder = SevenZip.Compression.LZMA.Decoder;
+using SevenZip.Sdk.Compression.Lzma;
+using Decoder = SevenZip.Sdk.Compression.Lzma.Decoder;
 
 namespace SourceUtils
 {
     public partial class ValveBspFile : DisposingEventTarget<ValveBspFile>
     {
+        public static int LZMA_ID = ( ( 'A' << 24 ) | ( 'M' << 16 ) | ( 'Z' << 8 ) | ( 'L' ) );
+
         [ThreadStatic]
         private static Dictionary<ValveBspFile, Stream> _sStreamPool;
 
@@ -71,7 +73,7 @@ namespace SourceUtils
             public int MapRevision;
         }
 
-        private class LzmaHeader
+        public class LzmaHeader
         {
             public static LzmaHeader Read( Stream stream )
             {
@@ -82,6 +84,9 @@ namespace SourceUtils
                 stream.Read( buffer, 0, 4 );
                 header.Identifier = BitConverter.ToUInt32( buffer, 0 );
 
+                if ( header.Identifier != LZMA_ID )
+                    throw new NotSupportedException( $"Unrecognized identifier {header.Identifier}" );
+
                 stream.Read( buffer, 0, 4 );
                 header.ActualSize = BitConverter.ToUInt32( buffer, 0 );
 
@@ -90,7 +95,7 @@ namespace SourceUtils
 
                 stream.Read( buffer, 0, 5 );
                 header.Properties = buffer;
-
+                
                 return header;
             }
 
@@ -275,7 +280,6 @@ namespace SourceUtils
             else
             {
                 // LZMA compressed lump
-
 
                 if ( type == LumpType.GAME_LUMP )
                 {

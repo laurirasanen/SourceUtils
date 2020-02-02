@@ -2,8 +2,8 @@
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Reflection;
 using ICSharpCode.SharpZipLib.Zip;
+using SevenZip;
 
 namespace SourceUtils
 {
@@ -17,29 +17,28 @@ namespace SourceUtils
             public static bool DebugContents { get; set; }
 
             [ThreadStatic]
-            private static Dictionary<PakFileLump, ZipFile> _sArchivePool;
+            private static Dictionary<PakFileLump, Stream> _sArchivePool;
 
-            private static ZipFile GetZipArchive( PakFileLump pak )
+            private static Stream GetPakStream( PakFileLump pak )
             {
-                var pool = _sArchivePool ?? (_sArchivePool = new Dictionary<PakFileLump, ZipFile>());
+                var pool = _sArchivePool ?? (_sArchivePool = new Dictionary<PakFileLump, Stream>());
 
-                ZipFile archive;
-                if ( pool.TryGetValue( pak, out archive ) ) return archive;
+                Stream stream;
+                if ( pool.TryGetValue( pak, out stream ) ) return stream;
 
-                var stream = pak._bspFile.GetLumpStream( pak.LumpType );
-                archive = new ZipFile( stream );
-                archive.UseZip64 = UseZip64.Off;
+                stream = pak._bspFile.GetLumpStream( pak.LumpType );
 
                 pak.Disposing += _ =>
                 {
                     pool.Remove( pak );
-                    archive.Close();
+                    stream.Close();
+                    stream.Dispose();
                 };
 
-                pool.Add( pak, archive );
+                pool.Add( pak, stream );
 
-                return archive;
-                }
+                return stream;
+            }
 
             public LumpType LumpType { get; }
 
@@ -78,7 +77,7 @@ namespace SourceUtils
                     using ( var stream = _bspFile.GetLumpStream( LumpType ) )
                     {
                         // https://stackoverflow.com/questions/46950386/sharpziplib-1-is-not-a-supported-code-page
-                        ZipConstants.DefaultCodePage = 437;
+                        ZipConstants.DefaultCodePage = 850;
                         using ( var archive = new ZipFile( stream ) )
                         {
                             _entryDict.Clear();
@@ -127,8 +126,24 @@ namespace SourceUtils
             public Stream OpenFile( string filePath )
             {
                 EnsureLoaded();
-                var archive = GetZipArchive( this );
-                return archive.GetInputStream( _entryDict[$"/{filePath}"] );
+
+                var stream = GetPakStream( this );
+                var outStream = new MemoryStream();
+                using ( var extractor = new SevenZipExtractor( stream ) )
+                {
+                    filePath = filePath.Replace( '/', '\\' );
+                    try
+                    {
+                        extractor.ExtractFile( filePath, outStream );
+                    }
+                    catch ( ArgumentOutOfRangeException e )
+                    {
+                        return null;
+                    }
+                }
+
+                outStream.Seek( 0, SeekOrigin.Begin );
+                return outStream;
             }
         }
     }

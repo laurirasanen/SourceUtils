@@ -248,7 +248,7 @@ namespace SourceUtils.ValveBsp
     {
         private readonly ValveBspFile _bspFile;
 
-        private string[] _modelDict;
+        private List<string> _modelDict;
         private ushort[] _leafDict;
         private IStaticProp[] _props;
 
@@ -262,7 +262,7 @@ namespace SourceUtils.ValveBsp
             get
             {
                 EnsureLoaded();
-                return _modelDict.Length;
+                return _modelDict.Count;
             }
         }
 
@@ -346,13 +346,16 @@ namespace SourceUtils.ValveBsp
                 {
                     var charBuffer = new byte[charBufferSize];
 
-                    _modelDict = new string[reader.ReadInt32()];
-                    for ( var i = 0; i < _modelDict.Length; ++i )
+                    int len = reader.ReadInt32();
+                    _modelDict = new List<string>();
+                    for ( var i = 0; i < len; ++i )
                     {
                         reader.BaseStream.Read( charBuffer, 0, charBufferSize );
                         int end;
                         for ( end = 0; end < charBufferSize && charBuffer[end] != 0; ++end ) ;
-                        _modelDict[i] = Encoding.ASCII.GetString( charBuffer, 0, end );
+                        _modelDict.Add(Encoding.ASCII.GetString( charBuffer, 0, end ));
+                        if (i > 100)
+                            throw new Exception("wtf");
                     }
 
                     var leafCount = reader.ReadInt32();

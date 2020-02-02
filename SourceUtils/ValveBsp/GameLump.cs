@@ -5,6 +5,7 @@ using System.Linq;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading.Tasks;
+using Decoder = SevenZip.Sdk.Compression.Lzma.Decoder;
 
 namespace SourceUtils
 {
@@ -64,7 +65,37 @@ namespace SourceUtils
                 EnsureLoaded();
 
                 var item = _items[id];
-                return _bspFile.GetSubStream( item.FileOffset, item.FileLength );
+                //var info = _bspFile.GetLumpInfo( LumpType );
+
+                var stream = _bspFile.GetSubStream( item.FileOffset, item.FileLength );
+
+                try
+                {
+                    LzmaHeader lzmaHeader = LzmaHeader.Read( stream );
+
+                    using ( var compressedStream =
+                        _bspFile.GetSubStream( item.FileOffset + LzmaHeader.Size, lzmaHeader.LzmaSize ) )
+                    {
+                        using ( var uncompressedStream = new MemoryStream( ( int ) lzmaHeader.ActualSize ) )
+                        {
+                            Decoder decoder = new Decoder();
+                            decoder.SetDecoderProperties( lzmaHeader.Properties );
+                            decoder.Code( compressedStream, uncompressedStream, lzmaHeader.LzmaSize,
+                                lzmaHeader.ActualSize, null );
+                            stream = new MemoryStream( ( int ) stream.Length );
+                            uncompressedStream.Seek( 0, SeekOrigin.Begin );
+                            uncompressedStream.CopyTo( stream );
+                        }
+                    }
+
+                    stream.Seek( 0, SeekOrigin.Begin );
+                    return stream;
+                }
+                catch ( NotSupportedException e )
+                {
+                    stream.Seek( 0, SeekOrigin.Begin );
+                    return stream;
+                }
             }
 
             private void EnsureLoaded()
