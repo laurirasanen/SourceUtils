@@ -131,9 +131,20 @@ namespace SourceUtils
                     {
                         extractor.ExtractFile( filePath, outStream );
                     }
-                    catch ( ArgumentOutOfRangeException e )
+                    catch ( ArgumentOutOfRangeException )
                     {
-                        return null;
+                        // File not found, try lower case variant
+                        try
+                        {
+                            // TODO: are all files lowercase in PakFiles?
+                            // should we do this before trying to extract the first time?
+                            filePath = filePath.ToLower();
+                            extractor.ExtractFile( filePath, outStream );
+                        }
+                        catch ( ArgumentOutOfRangeException )
+                        {
+                            return null;
+                        }
                     }
                 }
 
