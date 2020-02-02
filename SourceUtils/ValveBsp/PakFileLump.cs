@@ -2,7 +2,6 @@
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using ICSharpCode.SharpZipLib.Zip;
 using SevenZip;
 
 namespace SourceUtils
@@ -76,17 +75,13 @@ namespace SourceUtils
 
                     using ( var stream = _bspFile.GetLumpStream( LumpType ) )
                     {
-                        // https://stackoverflow.com/questions/46950386/sharpziplib-1-is-not-a-supported-code-page
-                        ZipConstants.DefaultCodePage = 850;
-                        using ( var archive = new ZipFile( stream ) )
+                        using ( var extractor = new SevenZipExtractor( stream ) )
                         {
                             _entryDict.Clear();
-                            for ( var i = 0; i < archive.Count; ++i )
+                            for ( var i = 0; i < extractor.FilesCount; ++i )
                             {
-                                var entry = archive[i];
-                                var path = $"/{entry.Name.Replace( '\\', '/' )}";
-                                if ( !entry.IsFile || _entryDict.ContainsKey( path ) )
-                                    continue;
+                                var entryName = extractor.ArchiveFileNames[i];
+                                var path = $"/{entryName.Replace( '\\', '/' )}";
                                 _entryDict.Add( path, i );
                             }
                         }

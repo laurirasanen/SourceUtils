@@ -65,8 +65,6 @@ namespace SourceUtils
                 EnsureLoaded();
 
                 var item = _items[id];
-                //var info = _bspFile.GetLumpInfo( LumpType );
-
                 var stream = _bspFile.GetSubStream( item.FileOffset, item.FileLength );
 
                 try
